@@ -1,6 +1,5 @@
 const { getOctokit, context } = require("@actions/github");
 const { execSync } = require("child_process");
-const BACKEND_URL = "http://127.0.0.1:8000/docs";
 
 const token = process.env.GITHUB_TOKEN;
 const backendUrl = process.env.BACKEND_URL;
