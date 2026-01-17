@@ -1,0 +1,26 @@
+name: AI Repo Supervisor
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  supervise:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install deps
+        run: npm install
+
+      - name: Run Supervisor
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BACKEND_URL: http://your-backend-url/analyze-pr
+        run: node dist/index.js
