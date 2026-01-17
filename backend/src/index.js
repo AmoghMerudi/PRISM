@@ -29,7 +29,7 @@ async function run() {
       const port = process.env.PORT || '8000';
       console.log('Starting FastAPI backend on port', port);
       const child = spawn(
-        'python',
+        'python3',
         [
           '-m',
           'uvicorn',
