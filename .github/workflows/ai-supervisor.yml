@@ -31,5 +31,5 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BACKEND_URL: "https://ai-repo-supervisor-zljk.onrender.com/analyze-pr"
-        run: node src/monitor.js
+        run: node src/index.js
         working-directory: backend
