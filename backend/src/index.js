@@ -1,19 +1,24 @@
-import * as github from "@actions/github";
-import fetch from "node-fetch";
-import { execSync } from "child_process";
+const { getOctokit, context } = require("@actions/github");
+const { execSync } = require("child_process");
 
-const token = process.env.GITHUB_TOKEN!;
-const backendUrl = process.env.BACKEND_URL!;
+const token = process.env.GITHUB_TOKEN;
+const backendUrl = process.env.BACKEND_URL;
+
+if (!token) {
+  console.error("GITHUB_TOKEN is not set");
+  process.exit(1);
+}
+if (!backendUrl) {
+  console.error("BACKEND_URL is not set");
+  process.exit(1);
+}
 
 async function run() {
-  const context = github.context;
-  const pr = context.payload.pull_request;
-
+  const pr = context.payload && context.payload.pull_request;
   if (!pr) return;
 
-  const octokit = github.getOctokit(token);
+  const octokit = getOctokit(token);
 
-  // Get PR diff
   const diff = await octokit.request(
     "GET /repos/{owner}/{repo}/pulls/{pull_number}",
     {
@@ -24,7 +29,6 @@ async function run() {
     }
   );
 
-  // Simple lint signal (example)
   let lintPassed = true;
   try {
     execSync("npm run lint", { stdio: "ignore" });
@@ -35,7 +39,7 @@ async function run() {
   const payload = {
     repo: `${context.repo.owner}/${context.repo.repo}`,
     pr_number: pr.number,
-    author: pr.user.login,
+    author: pr.user && pr.user.login,
     additions: pr.additions,
     deletions: pr.deletions,
     changed_files: pr.changed_files,
@@ -43,27 +47,41 @@ async function run() {
     lint_passed: lintPassed,
   };
 
+  if (typeof fetch !== "function") {
+    console.error("global fetch is not available on this Node runtime");
+    process.exit(1);
+  }
+
   const res = await fetch(backendUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
 
+  if (!res.ok) {
+    throw new Error(`Backend responded with ${res.status}`);
+  }
+
   const analysis = await res.json();
+
+  const risks = Array.isArray(analysis.risks) ? analysis.risks : [];
+  const suggestions = Array.isArray(analysis.suggestions)
+    ? analysis.suggestions
+    : [];
 
   const commentBody = `
 ## 🤖 AI Repo Supervisor
 
 ### Summary
-${analysis.summary}
+${analysis.summary || ""}
 
 ### Risk Indicators
-${analysis.risks.map((r: string) => `- ⚠️ ${r}`).join("\n")}
+${risks.map((r) => `- ⚠️ ${r}`).join("\n")}
 
 ### Suggested Actions (Human decides)
-${analysis.suggestions.map((s: string) => `- 👉 ${s}`).join("\n")}
+${suggestions.map((s) => `- 👉 ${s}`).join("\n")}
 
-**Repo Risk Score Change:** ${analysis.health_delta}
+**Repo Risk Score Change:** ${analysis.health_delta ?? ""}
 `;
 
   await octokit.rest.issues.createComment({
@@ -74,4 +92,7 @@ ${analysis.suggestions.map((s: string) => `- 👉 ${s}`).join("\n")}
   });
 }
 
-run();
+run().catch((err) => {
+  console.error("Action failed:", err);
+  process.exit(1);
+});
