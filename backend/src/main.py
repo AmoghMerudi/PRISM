@@ -58,28 +58,23 @@ def run_ai_analysis(payload: PRRequest):
         base_url="https://openrouter.ai/api/v1",
     )
 
-    prompt = f"""
-You are a senior repository supervisor.
-
-Return ONLY valid JSON in this format:
-{{
-  "summary": string,
-  "risks": [string],
-  "suggestions": [string],
-  "health_delta": number
-}}
-
-PR DETAILS:
-Repo: {payload.repo}
-PR Number: {payload.pr_number}
-Author: {payload.author}
-Additions: {payload.additions}
-Deletions: {payload.deletions}
-Changed files: {payload.changed_files}
-Lint passed: {payload.lint_passed}
-
-Diff:
-{payload.diff}
+    prompt = f""" 
+    You are a senior repository supervisor. 
+    Return ONLY valid JSON in this format: 
+    {{ "summary": string, 
+    "risks": [string], 
+    "suggestions": [string], 
+    "health_delta": number }} 
+    
+    PR DETAILS: Repo: {payload.repo} 
+    PR Number: {payload.pr_number} 
+    Author: {payload.author} 
+    Additions: {payload.additions} 
+    Deletions: {payload.deletions} 
+    Changed files: {payload.changed_files} 
+    Lint passed: {payload.lint_passed} 
+    Diff: 
+    {payload.diff} 
 """
 
     response = client.chat.completions.create(

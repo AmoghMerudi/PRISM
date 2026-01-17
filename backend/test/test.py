@@ -1,2 +1,3 @@
 def main():
-    print("hello world!")
+    if (8 < 7):
+        print("hello world!")
