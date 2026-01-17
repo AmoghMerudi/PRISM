@@ -58,25 +58,27 @@ def run_ai_analysis(payload: PRRequest):
         base_url="https://openrouter.ai/api/v1",
     )
 
-    prompt = f"""
-You are a senior repository supervisor.
+prompt = f"""
+You are a senior GitHub repository reviewer.
 
-Return ONLY valid JSON in this format:
+Analyze the pull request and return ONLY valid JSON.
+No markdown. No explanations.
+
+JSON schema:
 {{
-  "summary": string,
-  "risks": [string],
-  "suggestions": [string],
-  "health_delta": number
+  "summary": string,            // concise explanation of what changed
+  "risks": [string],            // potential reliability, security, or maintainability risks
+  "suggestions": [string],      // actionable improvement suggestions
+  "health_delta": number        // impact on repo health (-1.0 to +1.0)
 }}
 
-PR DETAILS:
-Repo: {payload.repo}
-PR Number: {payload.pr_number}
-Author: {payload.author}
-Additions: {payload.additions}
-Deletions: {payload.deletions}
-Changed files: {payload.changed_files}
-Lint passed: {payload.lint_passed}
+PR Context:
+- Repo: {payload.repo}
+- PR: #{payload.pr_number}
+- Author: {payload.author}
+- Additions/Deletions: +{payload.additions} / -{payload.deletions}
+- Files changed: {payload.changed_files}
+- Lint passed: {payload.lint_passed}
 
 Diff:
 {payload.diff}
