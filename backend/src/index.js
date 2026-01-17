@@ -4,6 +4,8 @@ const { execSync } = require("child_process");
 const token = process.env.GITHUB_TOKEN;
 const backendUrl = process.env.BACKEND_URL;
 const backendSecret = process.env.BACKEND_SECRETS || process.env.BACKEND_SECRET;
+const vercelBypass =
+  process.env.VERCEL_PROTECTION_BYPASS || process.env.VERCEL_BYPASS_TOKEN;
 if (!token) {
   console.error("GITHUB_TOKEN is not set");
   process.exit(1);
@@ -54,8 +56,16 @@ async function run() {
 
   const headers = { "Content-Type": "application/json" };
   if (backendSecret) headers.Authorization = `Bearer ${backendSecret}`;
+  if (vercelBypass) headers["x-vercel-protection-bypass"] = vercelBypass;
 
-  console.log('Posting analysis to backend:', backendUrl, 'authPresent:', !!backendSecret);
+  console.log(
+    "Posting analysis to backend:",
+    backendUrl,
+    "authPresent:",
+    !!backendSecret,
+    "vercelBypassPresent:",
+    !!vercelBypass
+  );
 
   const res = await fetch(backendUrl, {
     method: "POST",
