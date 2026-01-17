@@ -8,6 +8,7 @@ from pydantic import BaseModel
 # Use pymongo to talk to MongoDB Atlas
 import pymongo
 from pymongo.errors import PyMongoError
+from pymongo.collection import Collection
 
 app = FastAPI()
 
@@ -16,7 +17,7 @@ MONGODB_URI = os.environ.get("MONGODB_URI", "").strip()
 MONGODB_DB = os.environ.get("MONGODB_DB", "ai_repo_supervisor")
 
 mongo_client: Optional[pymongo.MongoClient] = None
-repo_collection = None
+repo_collection: Optional[Collection] = None
 
 # In-memory fallback if Mongo is not configured or unavailable (keeps behavior in demos)
 _in_memory_history: List[Dict[str, Any]] = []
@@ -30,7 +31,6 @@ if MONGODB_URI:
         repo_collection.create_index([("repo", pymongo.ASCENDING), ("timestamp", pymongo.DESCENDING)])
         print("Connected to MongoDB:", MONGODB_DB)
     except PyMongoError as e:
-        # Log and fall back to in-memory storage
         print("Warning: could not connect to MongoDB, falling back to in-memory store:", str(e))
         mongo_client = None
         repo_collection = None
@@ -51,7 +51,7 @@ class PRRequest(BaseModel):
 # ---- API Endpoints ----
 
 @app.post("/analyze-pr")
-def analyze_pr(payload: PRRequest):
+async def analyze_pr(payload: PRRequest):
     # Basic deterministic "analysis" for demo purposes
     risks: List[str] = []
     if not payload.lint_passed:
@@ -80,43 +80,66 @@ def analyze_pr(payload: PRRequest):
         "reason": reason,
         "pr_number": payload.pr_number,
         "author": payload.author,
+        "additions": payload.additions,
+        "deletions": payload.deletions,
+        "changed_files": payload.changed_files,
     }
 
-    if repo_collection:
+    # Use explicit None comparison to avoid Collection __bool__ error
+    if repo_collection is not None:
         try:
             repo_collection.insert_one(doc)
         except PyMongoError as e:
-            # don't crash analysis on DB write failure
-            print("Warning: failed to write to MongoDB:", str(e))
+            # don't crash analysis on DB write failure; fall back to memory
+            print("Warning: failed to write to MongoDB, falling back to in-memory:", str(e))
+            _in_memory_history.append(doc)
+            if len(_in_memory_history) > 1000:
+                _in_memory_history.pop(0)
     else:
         # in-memory fallback
         _in_memory_history.append(doc)
-        # keep list bounded for memory safety in long-running demos
         if len(_in_memory_history) > 1000:
             _in_memory_history.pop(0)
 
+    # Return analysis including health_score_impact (action expects this)
+    health_score_impact = -5 if risks else 0
     return {
         "summary": summary,
         "risks": risks,
         "suggestions": suggestions,
-        "health_delta": -5 if risks else 0
+        "health_score_impact": health_score_impact,
+        # keep backward-compatible field too
+        "health_delta": health_score_impact,
     }
 
 @app.get("/health")
-def health():
-    return {"status": "ok", "mongo": bool(repo_collection)}
+async def health():
+    # explicit None check
+    return {"status": "ok", "mongo": repo_collection is not None}
 
 @app.get("/health-history")
-def health_history(repo: str):
+async def health_history(repo: str):
     """
     Returns the most recent 20 health records for the given repo.
     """
     try:
-        if repo_collection:
-            cursor = repo_collection.find({"repo": repo}).sort("timestamp", pymongo.DESCENDING).limit(20)
-            rows = [{"timestamp": r.get("timestamp"), "score": r.get("score"), "reason": r.get("reason"), "pr_number": r.get("pr_number")} for r in cursor]
+        if repo_collection is not None:
+            try:
+                cursor = repo_collection.find({"repo": repo}).sort("timestamp", pymongo.DESCENDING).limit(20)
+                rows = [
+                    {
+                        "timestamp": r.get("timestamp"),
+                        "score": r.get("score"),
+                        "reason": r.get("reason"),
+                        "pr_number": r.get("pr_number"),
+                    }
+                    for r in cursor
+                ]
+            except PyMongoError as e:
+                print("Warning: error querying MongoDB:", str(e))
+                raise HTTPException(status_code=500, detail="DB query error")
         else:
             rows = [r for r in reversed(_in_memory_history) if r.get("repo") == repo][:20]
         return {"repo": repo, "history": rows}
-    except PyMongoError as e:
+    except PyMongoError:
         raise HTTPException(status_code=500, detail="DB error")

@@ -164,14 +164,17 @@ async function run() {
     // 5. BUILD PR COMMENT
     // ---------------------------------------------------------
     const riskList =
-      analysis.risks.length > 0
+      analysis.risks && analysis.risks.length > 0
         ? analysis.risks.map(r => `- 🔴 ${r}`).join('\n')
         : '- ✅ No significant risks detected.';
 
     const suggestionList =
-      analysis.suggestions.length > 0
+      analysis.suggestions && analysis.suggestions.length > 0
         ? analysis.suggestions.map(s => `- 💡 ${s}`).join('\n')
         : '- No immediate suggestions.';
+
+    // prefer the field the backend returns; be tolerant of either name
+    const healthImpact = (analysis.health_score_impact ?? analysis.health_delta) ?? 0;
 
     const commentBody = `
 ## 🤖 Repo Supervisor Report
@@ -185,9 +188,7 @@ ${riskList}
 ${suggestionList}
 
 ---
-**Health Impact:** ${analysis.health_score_impact > 0 ? '+' : ''}${
-      analysis.health_score_impact
-    } pts
+**Health Impact:** ${healthImpact > 0 ? '+' : ''}${healthImpact} pts
 `;
 
     // ---------------------------------------------------------
