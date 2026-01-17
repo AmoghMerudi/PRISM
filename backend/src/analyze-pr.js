@@ -1,3 +1,17 @@
+/**
+ * analyzePullRequest
+ *
+ * Input: PR metadata (diff size, lint status, files changed)
+ * Output:
+ *  - summary: plain English description
+ *  - risks: list of risk signals
+ *  - suggestions: non-enforcing recommendations
+ *  - health_delta: change in repo health score
+ *
+ * NOTE: This logic is intentionally deterministic for demo clarity.
+ * AI/Gemini can be swapped in later without changing the response shape.
+ */
+
 export function analyzePullRequest(payload) {
   const {
     repo = "unknown-repo",
