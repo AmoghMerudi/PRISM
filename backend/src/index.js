@@ -56,6 +56,8 @@ async function run() {
   const headers = { "Content-Type": "application/json" };
   if (backendSecret) headers.Authorization = `Bearer ${backendSecret}`;
 
+  console.log('Posting analysis to backend:', backendUrl, 'authPresent:', !!backendSecret);
+
   const res = await fetch(backendUrl, {
     method: "POST",
     headers,
@@ -63,7 +65,8 @@ async function run() {
   });
 
   if (!res.ok) {
-    throw new Error(`Backend responded with ${res.status}`);
+    const text = await res.text().catch(() => '');
+    throw new Error(`Backend responded with ${res.status}: ${text}`);
   }
 
   const analysis = await res.json();
