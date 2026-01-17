@@ -4,17 +4,20 @@ from datetime import datetime
 import sqlite3
 
 app = FastAPI()
-db = sqlite3.connect("health.db", check_same_thread=False)
 
-db.execute("""
+# ---- Database setup ----
+conn = sqlite3.connect("health.db", check_same_thread=False)
+conn.execute("""
 CREATE TABLE IF NOT EXISTS repo_health (
-  repo TEXT,
-  timestamp TEXT,
-  score INTEGER,
-  reason TEXT
+    repo TEXT,
+    timestamp TEXT,
+    score INTEGER,
+    reason TEXT
 )
 """)
+conn.commit()
 
+# ---- Request model ----
 class PRRequest(BaseModel):
     repo: str
     pr_number: int
@@ -25,42 +28,45 @@ class PRRequest(BaseModel):
     diff: str
     lint_passed: bool
 
+# ---- API Endpoints ----
 @app.post("/analyze-pr")
 def analyze_pr(pr: PRRequest):
     risks = []
     suggestions = []
 
-    size = pr.additions + pr.deletions
+    pr_size = pr.additions + pr.deletions
+    risk_score = 0
 
-    if size > 500:
+    if pr_size > 500:
         risks.append("Large PR size")
-        suggestions.append("Consider splitting this PR into smaller chunks")
+        suggestions.append("Consider splitting this PR")
+        risk_score += 3
 
     if pr.changed_files > 10:
         risks.append("Touches many files")
+        risk_score += 2
 
     if not pr.lint_passed:
         risks.append("Lint checks failed")
-        suggestions.append("Fix lint issues before merging")
-
-    # --- Simple risk score ---
-    risk_score = 0
-    risk_score += min(size // 100, 5)
-    risk_score += 2 if not pr.lint_passed else 0
+        suggestions.append("Fix lint issues")
+        risk_score += 2
 
     health_delta = -risk_score
 
-    # Store repo health
-    db.execute(
+    conn.execute(
         "INSERT INTO repo_health VALUES (?, ?, ?, ?)",
-        (pr.repo, datetime.utcnow().isoformat(), health_delta, ",".join(risks))
+        (
+            pr.repo,
+            datetime.utcnow().isoformat(),
+            health_delta,
+            ",".join(risks)
+        )
     )
-    db.commit()
+    conn.commit()
 
-    # Gemini placeholder (replace later)
     summary = (
-        f"This PR modifies {pr.changed_files} files with "
-        f"{pr.additions} additions and {pr.deletions} deletions."
+        f"This PR changes {pr.changed_files} files "
+        f"with {pr.additions} additions and {pr.deletions} deletions."
     )
 
     return {
@@ -72,7 +78,7 @@ def analyze_pr(pr: PRRequest):
 
 @app.get("/health-history")
 def health_history(repo: str):
-    rows = db.execute(
+    rows = conn.execute(
         "SELECT timestamp, score FROM repo_health WHERE repo = ?",
         (repo,)
     ).fetchall()
