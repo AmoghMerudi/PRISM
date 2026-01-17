@@ -17,19 +17,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          node-version: 18
+          python-version: 3.11
 
       - name: Install backend deps
         run: |
           cd backend
-          npm ci
+          pip install -r requirements.txt
 
-      - name: Run Supervisor
+      - name: Run AI test
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          BACKEND_URL: "https://ai-repo-supervisor-zljk.onrender.com/analyze-pr"
-        run: node src/monitor.js
-        working-directory: backend
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          cd backend/src
+          python test_ai.py
