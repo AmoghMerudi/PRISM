@@ -1,19 +1,85 @@
-"use client";
-
 import Link from "next/link";
-import { useParams } from "next/navigation";
 
-import { mockRepos } from "@/app/libs/mockRepos";
 import RecentPullRequestCard from "@/src/components/RecentPullRequestCard";
 import { getHealthLabelFromScore } from "@/src/adapters/prAdapter";
 
-export default function RepoPage() {
-  const params = useParams<{ repo?: string | string[] }>();
-  const repoParam = params?.repo ?? "";
-  const repoName = Array.isArray(repoParam) ? repoParam[0] : repoParam;
-  const normalizedRepoName = decodeURIComponent(repoName);
+type RepoSummary = {
+  repo: string;
+  current_health: number;
+  avg_score: number;
+  total_prs: number;
+};
 
-  const repo = mockRepos.find((r) => r.name === normalizedRepoName);
+type RepoHistoryEntry = {
+  pr_number: number;
+  pr_score: number;
+  health_delta: number;
+  overall_health?: number | null;
+  reason?: string | null;
+  author?: string | null;
+  timestamp?: string | null;
+};
+
+const getBackendBaseUrls = () => {
+  const base =
+    process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:8000";
+  if (base.endsWith("/api")) {
+    return [base];
+  }
+  return [base, `${base}/api`];
+};
+
+const fetchRepoSummary = async (repo: string): Promise<RepoSummary | null> => {
+  const baseUrls = getBackendBaseUrls();
+  for (const baseUrl of baseUrls) {
+    try {
+      const res = await fetch(
+        `${baseUrl}/db/repo-summary?repo=${encodeURIComponent(repo)}`,
+        { cache: "no-store" }
+      );
+      if (!res.ok) {
+        continue;
+      }
+      return res.json();
+    } catch {
+      continue;
+    }
+  }
+  return null;
+};
+
+const fetchRepoHistory = async (repo: string): Promise<RepoHistoryEntry[]> => {
+  const baseUrls = getBackendBaseUrls();
+  for (const baseUrl of baseUrls) {
+    try {
+      const res = await fetch(
+        `${baseUrl}/db/health-history?repo=${encodeURIComponent(
+          repo
+        )}&limit=10`,
+        { cache: "no-store" }
+      );
+      if (!res.ok) {
+        continue;
+      }
+      const data = await res.json();
+      return Array.isArray(data?.history) ? data.history : [];
+    } catch {
+      continue;
+    }
+  }
+  return [];
+};
+
+export default async function RepoPage({
+  params,
+}: {
+  params: { repo: string };
+}) {
+  const normalizedRepoName = decodeURIComponent(params.repo);
+  const [repo, history] = await Promise.all([
+    fetchRepoSummary(normalizedRepoName),
+    fetchRepoHistory(normalizedRepoName),
+  ]);
 
   if (!repo) {
     return (
@@ -40,7 +106,26 @@ export default function RepoPage() {
     );
   }
 
-  const healthLabel = getHealthLabelFromScore(repo.health.baseline_score);
+  const currentHealth =
+    typeof repo.current_health === "number" ? repo.current_health : 0;
+  const healthLabel = getHealthLabelFromScore(currentHealth);
+
+  const recentPrs = history.map((entry) => {
+    const risks = entry.reason ? entry.reason.split(",").filter(Boolean) : [];
+
+    return {
+      title: `PR #${entry.pr_number}`,
+      analysis: {
+        summary: `PR #${entry.pr_number} score ${entry.pr_score}`,
+        risks,
+        suggestions: [],
+        health_delta: entry.health_delta,
+        baseline_score:
+          typeof entry.overall_health === "number" ? entry.overall_health : 0,
+        semantic_score: null,
+      },
+    };
+  });
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-neutral-950 px-6 py-10 text-neutral-100 sm:px-10">
@@ -59,9 +144,9 @@ export default function RepoPage() {
             Back to dashboard
           </Link>
           <div className="mt-3 flex flex-wrap items-center gap-3">
-            <h1 className="text-3xl font-bold sm:text-4xl">{repo.name}</h1>
+            <h1 className="text-3xl font-bold sm:text-4xl">{repo.repo}</h1>
             <span className="rounded-full border border-neutral-700 px-3 py-1 text-xs text-neutral-300">
-              Health score {repo.health.baseline_score.toFixed(1)}
+              Health score {currentHealth.toFixed(1)}
             </span>
           </div>
           <p className="mt-2 text-sm text-neutral-300 sm:text-base">
@@ -76,13 +161,16 @@ export default function RepoPage() {
             </p>
             <div className="mt-4 flex items-baseline gap-3">
               <span className="text-4xl font-bold">
-                {repo.health.baseline_score.toFixed(1)}
+                {currentHealth.toFixed(1)}
               </span>
               <span className="rounded-full border border-neutral-700 px-3 py-1 text-xs font-semibold text-neutral-200">
                 {healthLabel}
               </span>
             </div>
-            <p className="mt-3 text-sm text-neutral-300">{repo.reason}</p>
+            <p className="mt-3 text-sm text-neutral-300">
+              Avg PR score {repo.avg_score.toFixed(1)} · {repo.total_prs} PRs
+              tracked
+            </p>
 
             <div className="mt-6 rounded-xl border border-neutral-800 bg-neutral-950/60 p-4">
               <div className="flex items-center justify-between text-xs text-neutral-500">
@@ -91,7 +179,7 @@ export default function RepoPage() {
               </div>
               <div className="mt-3 h-36 rounded-md border border-dashed border-neutral-700 bg-neutral-950/40" />
               <p className="mt-4 text-sm text-neutral-300">
-                Reason for recent health: {repo.reason}
+                Reason for recent health: {history[0]?.reason || "N/A"}
               </p>
             </div>
           </div>
@@ -100,17 +188,23 @@ export default function RepoPage() {
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold">Recent Pull Requests</h2>
               <span className="text-xs text-neutral-500">
-                {repo.prs.length} total
+                {repo.total_prs} total
               </span>
             </div>
             <div className="mt-4 space-y-3">
-              {repo.prs.map((pr) => (
-                <RecentPullRequestCard
-                  key={pr.title}
-                  title={pr.title}
-                  analysis={pr.analysis}
-                />
-              ))}
+              {recentPrs.length === 0 ? (
+                <div className="rounded-xl border border-neutral-800 bg-neutral-950/60 p-4 text-sm text-neutral-400">
+                  No recent pull requests found yet.
+                </div>
+              ) : (
+                recentPrs.map((pr) => (
+                  <RecentPullRequestCard
+                    key={pr.title}
+                    title={pr.title}
+                    analysis={pr.analysis}
+                  />
+                ))
+              )}
             </div>
           </div>
         </section>

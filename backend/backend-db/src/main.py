@@ -354,20 +354,46 @@ async def repo_summary_endpoint(repo: str):
     Return the summary document for a repo (from repo_summary collection or in-memory).
     Contains current_health (current overall health) and stats.
     """
-    # DB-backed summary
-    if repo_summary is not None:
+    # Prefer repo_health data as source of truth.
+    if repo_collection is not None:
         try:
-            doc = repo_summary.find_one({"repo": repo})
-            if not doc:
-                return {"repo": repo, "total_prs": 0, "cumulative_score": 0, "avg_score": 0.0, "current_health": INITIAL_REPO_HEALTH, "recent": []}
-            # ensure avg_score present
-            if "avg_score" not in doc:
-                total = doc.get("total_prs", 0)
-                cumulative = doc.get("cumulative_score", 0)
-                doc["avg_score"] = (cumulative / total) if total else 0.0
-            # remove internal _id for cleaner API response
-            doc.pop("_id", None)
-            return doc
+            cursor = (
+                repo_collection.find({"repo": repo})
+                .sort("timestamp", pymongo.DESCENDING)
+            )
+            rows = list(cursor)
+            if not rows:
+                return {
+                    "repo": repo,
+                    "total_prs": 0,
+                    "cumulative_score": 0,
+                    "avg_score": 0.0,
+                    "current_health": INITIAL_REPO_HEALTH,
+                    "recent": [],
+                }
+            total = len(rows)
+            cumulative = sum(r.get("pr_score", r.get("score", 0)) for r in rows)
+            avg = (cumulative / total) if total else 0.0
+            current_health = rows[0].get("overall_health", INITIAL_REPO_HEALTH)
+            recent = [
+                {
+                    "pr_number": r.get("pr_number"),
+                    "score": r.get("pr_score", r.get("score", 0)),
+                    "timestamp": r.get("timestamp"),
+                    "author": r.get("author"),
+                    "overall_health": r.get("overall_health"),
+                }
+                for r in rows[:RECENT_LIMIT]
+            ]
+            return {
+                "repo": repo,
+                "total_prs": total,
+                "cumulative_score": cumulative,
+                "avg_score": avg,
+                "current_health": current_health,
+                "recent": recent,
+                "updated_at": rows[0].get("timestamp"),
+            }
         except PyMongoError:
             raise HTTPException(status_code=500, detail="DB error")
 
@@ -383,3 +409,49 @@ async def repo_summary_endpoint(repo: str):
         current_health = s.get("current_health") if s else INITIAL_REPO_HEALTH
         return {"repo": repo, "total_prs": total, "cumulative_score": cumulative, "avg_score": avg, "current_health": current_health, "last": recent[0] if recent else None, "recent": recent}
     return s
+
+
+@app.get("/repos")
+async def list_repos(limit: int = 50):
+    """
+    Returns a list of repo summary documents for dashboard listing.
+    """
+    if repo_collection is not None:
+        try:
+            pipeline = [
+                {"$sort": {"timestamp": -1}},
+                {
+                    "$group": {
+                        "_id": "$repo",
+                        "repo": {"$first": "$repo"},
+                        "current_health": {"$first": "$overall_health"},
+                        "updated_at": {"$first": "$timestamp"},
+                        "total_prs": {"$sum": 1},
+                        "cumulative_score": {
+                            "$sum": {"$ifNull": ["$pr_score", "$score"]}
+                        },
+                    }
+                },
+                {
+                    "$addFields": {
+                        "avg_score": {
+                            "$cond": [
+                                {"$gt": ["$total_prs", 0]},
+                                {"$divide": ["$cumulative_score", "$total_prs"]},
+                                0,
+                            ]
+                        }
+                    }
+                },
+                {"$sort": {"updated_at": -1}},
+                {"$limit": limit},
+                {"$project": {"_id": 0}},
+            ]
+            repos = list(repo_collection.aggregate(pipeline))
+            return {"repos": repos}
+        except PyMongoError:
+            raise HTTPException(status_code=500, detail="DB error")
+
+    repos = list(_in_memory_summary.values())
+    repos.sort(key=lambda r: r.get("updated_at") or "", reverse=True)
+    return {"repos": repos[:limit]}
