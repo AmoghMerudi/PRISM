@@ -41,6 +41,19 @@ export default function RepoPage() {
   }
 
   const healthLabel = getHealthLabelFromScore(repo.health.baseline_score);
+  const history = repo.health_history;
+  const historyMin = Math.min(...history);
+  const historyMax = Math.max(...history);
+  const historyRange = historyMax - historyMin || 1;
+  const historyStep = Math.max(history.length - 1, 1);
+  const historyPoints = history
+    .map((value, index) => {
+      const x = (index / historyStep) * 100;
+      const y = 100 - ((value - historyMin) / historyRange) * 100;
+      return `${x.toFixed(2)},${y.toFixed(2)}`;
+    })
+    .join(" ");
+  const historyArea = `${historyPoints} 100,100 0,100`;
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-neutral-950 px-6 py-10 text-neutral-100 sm:px-10">
@@ -89,7 +102,33 @@ export default function RepoPage() {
                 <span>y-axis: health score</span>
                 <span>x-axis: time / PR no.</span>
               </div>
-              <div className="mt-3 h-36 rounded-md border border-dashed border-neutral-700 bg-neutral-950/40" />
+              <div className="mt-3 h-36 rounded-md border border-neutral-800 bg-neutral-950/40">
+                <svg
+                  className="h-full w-full"
+                  viewBox="0 0 100 100"
+                  preserveAspectRatio="none"
+                >
+                  <defs>
+                    <linearGradient
+                      id="health-area"
+                      x1="0"
+                      x2="0"
+                      y1="0"
+                      y2="1"
+                    >
+                      <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.35" />
+                      <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
+                    </linearGradient>
+                  </defs>
+                  <polygon points={historyArea} fill="url(#health-area)" />
+                  <polyline
+                    points={historyPoints}
+                    fill="none"
+                    stroke="#60a5fa"
+                    strokeWidth="2"
+                  />
+                </svg>
+              </div>
               <p className="mt-4 text-sm text-neutral-300">
                 Reason for recent health: {repo.reason}
               </p>
