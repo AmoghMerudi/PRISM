@@ -32,7 +32,7 @@ jobs:
 
       - name: Call Render AI service (no secret)
         env:
-          RENDER_AI_URL: "https://your-render-host.example.com" # <-- replace with your Render URL
+          RENDER_AI_URL: "https://ai-repo-supervisor-agentic.onrender.com/"
         run: |
           PAYLOAD=$(jq -n \
             --arg repo "${{ steps.meta.outputs.repo }}" \
