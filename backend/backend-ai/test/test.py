@@ -1,3 +1,5 @@
 def main():
-    if (5< 3+3):
-        print("Goodbye")
+    int i = 0
+    while (i == 0):
+        print("Goodbyeeeeeee")
+        print("No. Wait for me.")
