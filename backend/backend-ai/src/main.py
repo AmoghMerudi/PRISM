@@ -10,7 +10,7 @@ from openai import OpenAI
 from dotenv import load_dotenv
 
 # New imports
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Any as _Any
 try:
     import pymongo
     from pymongo import ReturnDocument
@@ -57,9 +57,9 @@ conn.commit()
 # -----------------------------------
 # MongoDB setup (optional)
 # -----------------------------------
-mongo_client: Optional[pymongo.MongoClient] = None
-repo_collection: Optional[Collection] = None
-repo_summary: Optional[Collection] = None
+mongo_client: Optional[_Any] = None
+repo_collection: Optional[_Any] = None
+repo_summary: Optional[_Any] = None
 RECENT_LIMIT = 20
 INITIAL_REPO_HEALTH = 100
 
