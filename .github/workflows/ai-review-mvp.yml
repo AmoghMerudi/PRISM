@@ -1,4 +1,4 @@
-name: AI PR Review (MVP, no secrets)
+name: AI Repo Supervisor
 
 # Use pull_request_target so GITHUB_TOKEN can comment even for fork PRs.
 on:
@@ -76,13 +76,24 @@ jobs:
       - name: Comment on PR with AI summary (always attempt)
         if: always()
         run: |
+          # prefer server-provided comment field
           COMMENT=$(jq -r '.comment // empty' response.json || true)
           if [ -z "$COMMENT" ]; then
             SUMMARY=$(jq -r '.summary // "No summary returned."' response.json)
             PR_SCORE=$(jq -r '.pr_score // "unknown"' response.json)
-            COMMENT="**AI review (MVP)**\n\nScore: \`${PR_SCORE}\`\n\nSummary:\n\n${SUMMARY}"
+            # build COMMENT with actual newlines using a heredoc so GitHub renders markdown correctly
+            COMMENT=$(cat <<EOF
+**AI review (MVP)**
+
+Score: \`${PR_SCORE}\`
+
+Summary:
+
+${SUMMARY}
+EOF
+)
           fi
-          echo "Posting comment to PR #${{ github.event.pull_request.number }} (length=$(echo "$COMMENT" | wc -c))"
+          echo "Posting comment to PR #${{ github.event.pull_request.number }} (comment length=$(echo "$COMMENT" | wc -c))"
           set +e
           HTTP_CODE=$(curl -s -o gh_response.json -w "%{http_code}" -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" -X POST \
             -d "$(jq -nc --arg body "$COMMENT" '{body:$body}')" \
