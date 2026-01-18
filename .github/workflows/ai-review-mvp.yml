@@ -3,7 +3,7 @@ name: AI Repo Supervisor
 # Use pull_request_target so GITHUB_TOKEN can comment even for fork PRs.
 on:
   pull_request_target:
-    types: [opened, reopened]
+    types: [opened, reopened, synchronize]
 
 permissions:
   issues: write   # allow posting comments (issues endpoint used for PR comments)
@@ -34,7 +34,8 @@ jobs:
           DIFF_URL="https://api.github.com/repos/${REPO}/pulls/${PR}"
           DIFF=$(curl -sS -H "Accept: application/vnd.github.v3.diff" -H "Authorization: Bearer $GITHUB_TOKEN" "$DIFF_URL")
           TRUNC="${DIFF:0:20000}"
-          echo "::set-output name=diff::${TRUNC}"
+          # use the new output syntax
+          echo "diff=${TRUNC}" >> $GITHUB_OUTPUT
 
       - name: Call Render AI service (no secret)
         env:
