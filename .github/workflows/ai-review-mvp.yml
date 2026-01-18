@@ -86,17 +86,8 @@ jobs:
           if [ -z "$COMMENT" ]; then
             SUMMARY=$(jq -r '.summary // "No summary returned."' response.json)
             PR_SCORE=$(jq -r '.pr_score // "unknown"' response.json)
-            # build COMMENT with actual newlines using a heredoc so GitHub renders markdown correctly
-            COMMENT=$(cat <<EOF
-**AI review (MVP)**
-
-Score: \`${PR_SCORE}\`
-
-Summary:
-
-${SUMMARY}
-EOF
-)
+            # build COMMENT safely (avoid YAML/heredoc parsing issues)
+            COMMENT=$(printf "%s\n\nScore: \`%s\`\n\nSummary:\n\n%s\n" "**AI review (MVP)**" "$PR_SCORE" "$SUMMARY")
           fi
           echo "Posting comment to PR #${{ github.event.pull_request.number }} (comment length=$(echo "$COMMENT" | wc -c))"
           set +e
