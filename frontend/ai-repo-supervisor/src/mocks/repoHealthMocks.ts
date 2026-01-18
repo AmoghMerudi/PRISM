@@ -16,6 +16,47 @@ export type RepoSummaryMock = {
 
 export const repoHealthMocks: RepoSummaryMock[] = [
   {
+    repo: "auth-service",
+    current_health: 72,
+    avg_score: 6,
+    total_prs: 2,
+    cumulative_score: 12,
+    updated_at: "2026-01-17T22:12:48.205190",
+    recent: [
+      {
+        pr_number: 14,
+        score: 3,
+        timestamp: "2026-01-17T22:12:48.205190",
+        author: "amogh",
+        overall_health: 72,
+      },
+      {
+        pr_number: 13,
+        score: 9,
+        timestamp: "2026-01-17T20:55:01.016220",
+        author: "carol",
+        overall_health: 75,
+      },
+    ],
+  },
+  {
+    repo: "frontend-app",
+    current_health: 88,
+    avg_score: 8,
+    total_prs: 1,
+    cumulative_score: 8,
+    updated_at: "2026-01-17T20:11:44.100000",
+    recent: [
+      {
+        pr_number: 22,
+        score: 8,
+        timestamp: "2026-01-17T20:11:44.100000",
+        author: "zoe",
+        overall_health: 88,
+      },
+    ],
+  },
+  {
     repo: "owner/repo",
     current_health: 90,
     avg_score: 5,

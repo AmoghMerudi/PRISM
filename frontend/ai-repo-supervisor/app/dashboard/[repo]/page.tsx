@@ -4,6 +4,7 @@ import RecentPullRequestCard from "@/src/components/RecentPullRequestCard";
 import type { BackendAnalyzeResponse } from "@/src/adapters/prAdapter";
 import { getHealthLabelFromScore } from "@/src/adapters/prAdapter";
 import { repoHealthMocks } from "@/src/mocks/repoHealthMocks";
+import { mockRepos } from "@/src/mocks/mockRepos";
 
 type RepoSummary = {
   repo: string;
@@ -86,16 +87,19 @@ export default async function RepoPage({
 }: {
   params: { repo: string };
 }) {
-  const normalizedRepoName = decodeURIComponent(params.repo);
+  const normalizedRepoName = decodeURIComponent(params.repo ?? "");
   const [repo, history] = await Promise.all([
     fetchRepoSummary(normalizedRepoName),
     fetchRepoHistory(normalizedRepoName),
   ]);
   const fallbackRepo =
     repoHealthMocks.find((item) => item.repo === normalizedRepoName) || null;
-  const resolvedRepo = repo ?? fallbackRepo;
+  const fallbackMockRepo =
+    mockRepos.find((item) => item.name === normalizedRepoName) ||
+    (normalizedRepoName ? null : mockRepos[0]);
+  const resolvedRepo = repo ?? fallbackRepo ?? null;
 
-  if (!resolvedRepo) {
+  if (!resolvedRepo && !fallbackMockRepo) {
     return (
       <main className="relative min-h-screen overflow-hidden bg-neutral-950 px-6 py-10 text-neutral-100 sm:px-10">
         <div className="pointer-events-none absolute inset-0">
@@ -121,12 +125,12 @@ export default async function RepoPage({
   }
 
   const currentHealth =
-    typeof resolvedRepo.current_health === "number"
+    typeof resolvedRepo?.current_health === "number"
       ? resolvedRepo.current_health
-      : 0;
+      : fallbackMockRepo?.health.baseline_score ?? 0;
   const healthLabel = getHealthLabelFromScore(currentHealth);
 
-  const fallbackHistory: RepoHistoryEntry[] = (resolvedRepo.recent || []).map(
+  const fallbackHistory: RepoHistoryEntry[] = (resolvedRepo?.recent || []).map(
     (entry) => ({
       pr_number: entry.pr_number,
       pr_score: entry.score ?? 0,
@@ -140,22 +144,31 @@ export default async function RepoPage({
   const historySource: RepoHistoryEntry[] =
     history.length > 0 ? history : fallbackHistory;
 
-  const recentPrs = historySource.map((entry: RepoHistoryEntry) => {
-    const risks = entry.reason ? entry.reason.split(",").filter(Boolean) : [];
+  const recentPrs =
+    historySource.length > 0
+      ? historySource.map((entry: RepoHistoryEntry) => {
+          const risks = entry.reason
+            ? entry.reason.split(",").filter(Boolean)
+            : [];
 
-    return {
-      title: `PR #${entry.pr_number}`,
-      analysis: {
-        summary: `PR #${entry.pr_number} score ${entry.pr_score}`,
-        risks,
-        suggestions: [],
-        health_delta: entry.health_delta,
-      baseline_score:
-        typeof entry.overall_health === "number" ? entry.overall_health : 0,
-        semantic_score: null,
-      } satisfies BackendAnalyzeResponse,
-    };
-  });
+          return {
+            title: `PR #${entry.pr_number}`,
+            analysis: {
+              summary: `PR #${entry.pr_number} score ${entry.pr_score}`,
+              risks,
+              suggestions: [],
+              health_delta: entry.health_delta,
+              baseline_score:
+                typeof entry.overall_health === "number"
+                  ? entry.overall_health
+                  : 0,
+              semantic_score: null,
+            } satisfies BackendAnalyzeResponse,
+          };
+        })
+      : fallbackMockRepo
+        ? fallbackMockRepo.prs
+        : [];
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-neutral-950 px-6 py-10 text-neutral-100 sm:px-10">
@@ -175,7 +188,7 @@ export default async function RepoPage({
           </Link>
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <h1 className="text-3xl font-bold sm:text-4xl">
-              {resolvedRepo.repo}
+              {resolvedRepo?.repo || fallbackMockRepo?.name}
             </h1>
             <span className="rounded-full border border-neutral-700 px-3 py-1 text-xs text-neutral-300">
               Health score {currentHealth.toFixed(1)}
@@ -200,8 +213,9 @@ export default async function RepoPage({
               </span>
             </div>
             <p className="mt-3 text-sm text-neutral-300">
-              Avg PR score {resolvedRepo.avg_score.toFixed(1)} ·{" "}
-              {resolvedRepo.total_prs} PRs
+              Avg PR score{" "}
+              {(resolvedRepo?.avg_score ?? fallbackMockRepo?.health.semantic_score ?? 0).toFixed(1)}{" "}
+              · {resolvedRepo?.total_prs ?? fallbackMockRepo?.prs.length ?? 0} PRs
               tracked
             </p>
 
@@ -221,7 +235,7 @@ export default async function RepoPage({
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold">Recent Pull Requests</h2>
               <span className="text-xs text-neutral-500">
-                {resolvedRepo.total_prs} total
+                {resolvedRepo?.total_prs ?? fallbackMockRepo?.prs.length ?? 0} total
               </span>
             </div>
             <div className="mt-4 space-y-3">
