@@ -5,7 +5,7 @@ PRISM is a human-in-the-loop AI system that helps engineering teams understand p
 It does not auto-merge code, spam PR comments, or blindly enforce rules.
 PRISM analyzes, explains, and advises — humans stay in control.
 
-⸻
+
 
 ## Inspiration
 
@@ -24,7 +24,7 @@ They fail to answer:
 
 PRISM was built to fill that gap.
 
-⸻
+
 
 ## What it does
 
@@ -73,7 +73,7 @@ PRISM:
 
 It advises. Humans decide.
 
-⸻
+
 
 ## How we built it
 
@@ -106,7 +106,7 @@ Architecture Philosophy
 	•	Human-readable outputs
 	•	Scalable to GitHub Actions integration
 
-⸻
+
 
 ## Challenges we ran into
 	•	Designing a health score that is intuitive, directional, and explainable
@@ -115,7 +115,7 @@ Architecture Philosophy
 	•	Frontend–backend integration under hackathon time pressure
 	•	Git branch chaos (character-building experience)
 
-⸻
+
 
 ## Accomplishments we’re proud of
 	•	Built a repo-level supervision model, not just a PR checker
@@ -124,7 +124,7 @@ Architecture Philosophy
 	•	Delivered a clean, demo-ready UI
 	•	Kept humans in control at every step
 
-⸻
+
 
 ## What we learned
 	•	AI is most effective when it augments judgment, not replaces it
@@ -132,7 +132,7 @@ Architecture Philosophy
 	•	Explainability builds trust faster than automation
 	•	Clean contracts between systems save lives (and hackathons)
 
-⸻
+
 
 ## What’s next for PRISM
 
@@ -145,7 +145,7 @@ Planned extensions:
 
 PRISM aims to become a copilot for code review decisions, not a gatekeeper.
 
-⸻
+
 
 ## Built with
 	•	Python
