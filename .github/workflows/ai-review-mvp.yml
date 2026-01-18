@@ -43,10 +43,29 @@ jobs:
             --argjson changed_files ${{ steps.meta.outputs.changed_files }} \
             --arg diff "${{ steps.diff.outputs.diff }}" \
             '{repo:$repo,pr_number:$pr_number,author:$author,additions:$additions,deletions:$deletions,changed_files:$changed_files,diff:$diff,lint_passed:false}')
-          curl --fail --retry 2 --retry-delay 2 -X POST "$RENDER_AI_URL/analyze-pr" \
+          echo "Posting to $RENDER_AI_URL/analyze-pr (truncated payload shown)"
+          echo "$PAYLOAD" | jq -c '. | {repo,pr_number,author,additions,deletions,changed_files, diff_len:(.diff|length)}'
+          # Call the service, capture HTTP code and ensure response.json exists
+          set +e
+          HTTP_CODE=$(curl -s -o response.json -w "%{http_code}" -X POST "$RENDER_AI_URL/analyze-pr" \
             -H "Content-Type: application/json" \
-            -d "$PAYLOAD" -o response.json || true
-          cat response.json || true
+            -d "$PAYLOAD")
+          CURL_EXIT=$?
+          set -e
+          echo "curl exit: $CURL_EXIT http_code: $HTTP_CODE"
+          if [ "$CURL_EXIT" -ne 0 ] || [ -z "$HTTP_CODE" ] || [ "$HTTP_CODE" -ge 400 ]; then
+            echo "Request failed or returned HTTP $HTTP_CODE"
+            if [ -s response.json ]; then
+              echo "Response body:"
+              cat response.json
+            else
+              echo "{}" > response.json
+              echo "Empty response saved as {} to response.json"
+            fi
+          else
+            echo "Successful response (HTTP $HTTP_CODE):"
+            cat response.json
+          fi
 
       - name: Comment on PR with AI summary (optional)
         if: always()
