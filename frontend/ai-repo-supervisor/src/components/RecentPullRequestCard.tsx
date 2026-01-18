@@ -30,7 +30,7 @@ export default function RecentPullRequestCard({
   const adapted = adaptPRAnalysis(analysis);
 
   return (
-    <div className="rounded-xl border border-neutral-800 bg-neutral-950/60 p-4">
+    <div className="rounded-xl border border-white/20 bg-white/10 p-4 shadow-xl shadow-black/40 backdrop-blur-xl backdrop-saturate-150 transition hover:-translate-y-0.5 hover:border-white/30 hover:bg-white/15">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="font-medium text-neutral-100">{title}</p>
